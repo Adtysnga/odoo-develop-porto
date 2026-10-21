@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_rental_receipt" model="ir.actions.report">
+        <field name="name">Kuitansi Pembayaran Sewa</field>
+        <field name="model">rental.contract</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">rental_house_management.report_rental_receipt_document</field>
+        <field name="report_file">rental_house_management.report_rental_receipt_document</field>
+        <field name="print_report_name">'Kuitansi - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_rental_contract"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_rental_receipt_document">
+        <t t-call="web.external_layout">
+            <t t-foreach="docs" t-as="o">
+                <div class="page">
+                    <h2 class="text-center mt-4">KUITANSI PEMBAYARAN SEWA RUMAH</h2>
+                    <hr/>
+                    <table class="table table-borderless mt-4 fs-5">
+                        <tr>
+                            <td style="width: 30%;"><strong>No. Kuitansi</strong></td>
+                            <td>: <span t-field="o.name"/></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Telah Diterima Dari</strong></td>
+                            <td>: <span t-field="o.tenant_name"/> (<span t-field="o.tenant_phone"/>)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Unit Rumah</strong></td>
+                            <td>: <span t-field="o.house_id.name"/></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Uang Sejumlah</strong></td>
+                            <td>: <strong>Rp <span t-esc="'{:,}'.format(int(o.amount))"/></strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Periode Jatuh Tempo</strong></td>
+                            <td>: <span t-field="o.due_date"/></td>
+                        </tr>
+                    </table>
+                    <div class="row mt-5 text-end">
+                        <div class="col-12">
+                            <p>Dicetak Pada: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d-%m-%Y %H:%M')"/></p>
+                            <br/><br/>
+                            <p><strong>( Admin / Pemilik Rumah )</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
