@@ -1,15 +1,16 @@
 {
-    'name': 'Sewa Rumah Management & WA Notification',
+    'name': 'Rental House Management',
     'version': '1.0',
-    'summary': 'Modul Pemantauan Sewa Rumah dan Otomatisasi Pengingat WA',
+    'summary': 'Manajemen Sewa Rumah, Pembukuan, & WhatsApp Gateway Notification',
     'category': 'Real Estate',
-    'author': 'Adit Custom Odoo',
-    'depends': ['base'],
+    'author': 'Aditya Syahputra Sinaga',
+    'depends': ['base', 'web'],
     'data': [
         'security/ir.model.access.csv',
+        'data/rental_sequence.xml',
         'views/rental_contract_view.xml',
+        'views/rental_report_template.xml',
     ],
     'installable': True,
     'application': True,
-    'license': 'LGPL-3',
 }

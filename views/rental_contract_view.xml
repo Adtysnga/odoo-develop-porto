@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Master Rumah Form & List View -->
+    <!-- 1. Master Rumah List & Form View -->
     <record id="view_rental_house_tree" model="ir.ui.view">
         <field name="name">rental.house.list</field>
         <field name="model">rental.house</field>
         <field name="arch" type="xml">
-            <list string="Daftar Unit Rumah">
+            <list>
                 <field name="name"/>
                 <field name="house_type"/>
                 <field name="address"/>
@@ -39,7 +39,7 @@
         </field>
     </record>
 
-    <!-- Search View Filter -->
+    <!-- 2. Search View Filter -->
     <record id="view_rental_contract_search" model="ir.ui.view">
         <field name="name">rental.contract.search</field>
         <field name="model">rental.contract</field>
@@ -53,31 +53,16 @@
                 <field name="state" string="Status Pembayaran"/>
 
                 <separator/>
-
-                <!-- Filter Status Pembayaran -->
                 <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Berjalan" name="filter_active" domain="[('state', '=', 'active')]"/>
-                <filter string="Jatuh Tempo (H+1 Belum Bayar)" name="filter_overdue" domain="[('state', '=', 'overdue')]"/>
+                <filter string="Jatuh Tempo" name="filter_overdue" domain="[('state', '=', 'overdue')]"/>
                 <filter string="Lunas / Dibayar" name="filter_paid" domain="[('state', '=', 'paid')]"/>
-
-                <separator/>
-
-                <!-- Filter Skema Cicilan -->
-                <filter string="Skema: Perbulan" name="filter_monthly" domain="[('payment_scheme', '=', 'monthly')]"/>
-                <filter string="Skema: Pertahun" name="filter_yearly" domain="[('payment_scheme', '=', 'yearly')]"/>
-
-                <separator/>
-
-                <group expand="0" string="Group By">
-                    <filter string="Status Pembayaran" name="group_state" context="{'group_by': 'state'}"/>
-                    <filter string="Skema Cicilan" name="group_payment_scheme" context="{'group_by': 'payment_scheme'}"/>
-                    <filter string="Tipe Rumah" name="group_house_type" context="{'group_by': 'house_type'}"/>
-                </group>
+                <filter string="Selesai Kontrak" name="filter_done" domain="[('state', '=', 'done')]"/>
             </search>
         </field>
     </record>
 
-    <!-- Kanban View Menyamping (Grid View) -->
+    <!-- 3. Kanban View (Kartu Grid Menyamping Penuh Layar) -->
     <record id="view_rental_contract_kanban" model="ir.ui.view">
         <field name="name">rental.contract.kanban</field>
         <field name="model">rental.contract</field>
@@ -85,58 +70,26 @@
             <kanban class="o_kanban_mobile">
                 <field name="name"/>
                 <field name="tenant_name"/>
-                <field name="tenant_phone"/>
                 <field name="house_id"/>
-                <field name="house_type"/>
-                <field name="payment_scheme"/>
                 <field name="amount"/>
                 <field name="due_date"/>
                 <field name="state"/>
                 <templates>
                     <t t-name="card">
-                        <div class="p-3 mb-2 bg-white rounded-3 shadow-sm border-0">
-                            <!-- Baris 1: Nama Penyewa & Badge Status -->
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong class="fs-5 text-primary">
-                                    <field name="tenant_name"/>
-                                </strong>
+                        <div class="oe_kanban_global_click p-3 shadow-sm rounded-3 border-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="fs-5 text-primary"><field name="tenant_name"/></strong>
                                 <field name="state" widget="badge" 
                                        decoration-muted="state == 'draft'"
                                        decoration-info="state == 'active'" 
                                        decoration-danger="state == 'overdue'" 
-                                       decoration-success="state == 'paid'"/>
+                                       decoration-success="state == 'paid'"
+                                       decoration-warning="state == 'done'"/>
                             </div>
-
-                            <!-- Baris 2: Nama Unit Rumah & Skema Cicilan -->
-                            <div class="d-flex justify-content-between align-items-center text-muted mb-2 fs-6">
-                                <div>
-                                    <i class="fa fa-home me-1 text-secondary" title="Unit Rumah"/>
-                                    <field name="house_id"/>
-                                </div>
-                                <field name="payment_scheme" widget="badge"
-                                       decoration-info="payment_scheme == 'monthly'"
-                                       decoration-warning="payment_scheme == 'yearly'"/>
-                            </div>
-
-                            <!-- Baris 3: Tanggal Jatuh Tempo & No. WhatsApp -->
-                            <div class="text-muted small mb-2">
-                                <div class="mb-1">
-                                    <i class="fa fa-whatsapp me-1 text-success" title="Nomor WhatsApp"/>
-                                    <field name="tenant_phone"/>
-                                </div>
-                                <div>
-                                    <i class="fa fa-calendar me-1 text-danger" title="Tanggal Jatuh Tempo"/>
-                                    <span>Jatuh Tempo: </span>
-                                    <strong class="text-dark"><field name="due_date"/></strong>
-                                </div>
-                            </div>
-
-                            <!-- Baris 4: Nominal Cicilan / Sewa -->
-                            <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
-                                <span class="text-uppercase small text-muted">Nominal Sewa</span>
-                                <span class="fw-bold fs-5 text-success">
-                                    Rp <field name="amount"/>
-                                </span>
+                            <div class="mt-2 text-muted">
+                                <div>🏠 <field name="house_id"/></div>
+                                <div>📅 Jatuh Tempo: <field name="due_date"/></div>
+                                <div class="fw-bold text-success fs-6 mt-1">Rp <field name="amount"/></div>
                             </div>
                         </div>
                     </t>
@@ -145,12 +98,12 @@
         </field>
     </record>
 
-    <!-- List View -->
+    <!-- 4. List View Kontrak Sewa -->
     <record id="view_rental_contract_tree" model="ir.ui.view">
         <field name="name">rental.contract.list</field>
         <field name="model">rental.contract</field>
         <field name="arch" type="xml">
-            <list string="Daftar Sewa Rumah" default_order="due_date asc">
+            <list>
                 <field name="name"/>
                 <field name="tenant_name"/>
                 <field name="tenant_phone"/>
@@ -163,12 +116,13 @@
                        decoration-muted="state == 'draft'"
                        decoration-info="state == 'active'" 
                        decoration-danger="state == 'overdue'" 
-                       decoration-success="state == 'paid'"/>
+                       decoration-success="state == 'paid'"
+                       decoration-warning="state == 'done'"/>
             </list>
         </field>
     </record>
 
-    <!-- Form View -->
+    <!-- 5. Form View Kontrak Sewa (Dengan Tombol Selesai Kontrak) -->
     <record id="view_rental_contract_form" model="ir.ui.view">
         <field name="name">rental.contract.form</field>
         <field name="model">rental.contract</field>
@@ -176,9 +130,18 @@
             <form string="Form Sewa Rumah">
                 <header>
                     <button name="action_confirm" string="Konfirmasi Kontrak" type="object" class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_set_to_paid" string="✔ Tandai Lunas / Dibayar" type="object" class="btn-success btn-lg" invisible="state in ('draft', 'paid')"/>
-                    <button name="action_manual_send_wa" string="📲 Kirim Pesan WA Manual" type="object" class="btn-secondary"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,active,overdue,paid"/>
+                    <button name="action_set_to_paid" string="✔ Tandai Lunas / Dibayar" type="object" class="btn-success btn-lg" invisible="state in ('draft', 'paid', 'done')"/>
+                    <button name="action_manual_send_wa" string="📲 Kirim Pesan WA Manual" type="object" class="btn-secondary" invisible="state == 'done'"/>
+                    
+                    <!-- Tombol Putus/Selesai Kontrak -->
+                    <button name="action_terminate_contract" 
+                            string="🛑 Selesai / Putus Kontrak" 
+                            type="object" 
+                            class="btn-danger" 
+                            confirm="Apakah Anda yakin ingin menyelesaikan kontrak ini? Unit rumah akan kembali berstatus TERSEDIA." 
+                            invisible="state in ('draft', 'done')"/>
+
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,overdue,paid,done"/>
                 </header>
                 <sheet>
                     <div class="oe_title mb-3">
@@ -211,7 +174,7 @@
                     <notebook>
                         <page string="📱 Riwayat Pengiriman WA">
                             <field name="wa_log_ids" readonly="1">
-                                <list string="Log WA">
+                                <list>
                                     <field name="send_date"/>
                                     <field name="phone"/>
                                     <field name="message"/>
@@ -225,7 +188,50 @@
         </field>
     </record>
 
-    <!-- Actions & Menus -->
+    <!-- 6. Pembukuan Keuangan Views (List & Form) -->
+    <record id="view_rental_accounting_tree" model="ir.ui.view">
+        <field name="name">rental.accounting.list</field>
+        <field name="model">rental.accounting</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="payment_date"/>
+                <field name="tenant_name"/>
+                <field name="house_id"/>
+                <field name="payment_method"/>
+                <field name="amount" sum="Total Pemasukan"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_rental_accounting_form" model="ir.ui.view">
+        <field name="name">rental.accounting.form</field>
+        <field name="model">rental.accounting</field>
+        <field name="arch" type="xml">
+            <form string="Detail Pembukuan">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="contract_id"/>
+                            <field name="tenant_name"/>
+                            <field name="house_id"/>
+                        </group>
+                        <group>
+                            <field name="payment_date"/>
+                            <field name="amount"/>
+                            <field name="payment_method"/>
+                        </group>
+                    </group>
+                    <field name="notes" placeholder="Catatan Pembukuan..."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- 7. Window Actions -->
     <record id="action_rental_contract" model="ir.actions.act_window">
         <field name="name">Pemantauan Sewa Rumah</field>
         <field name="res_model">rental.contract</field>
@@ -239,6 +245,13 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <record id="action_rental_accounting" model="ir.actions.act_window">
+        <field name="name">Pembukuan Keuangan</field>
+        <field name="res_model">rental.accounting</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- 8. Cron Job Pengingat WA -->
     <record id="ir_cron_auto_wa_rental_reminder" model="ir.cron">
         <field name="name">Sewa Rumah: Check &amp; Kirim Pengingat WA Otomatis</field>
         <field name="model_id" ref="model_rental_contract"/>
@@ -249,7 +262,24 @@
         <field name="active">True</field>
     </record>
 
+    <!-- 9. Menu Utama & Sub-Menu Navigasi -->
     <menuitem id="menu_rental_house_root" name="Sewa Rumah" sequence="10"/>
-    <menuitem id="menu_rental_contract" name="Pemantauan Sewa" parent="menu_rental_house_root" action="action_rental_contract" sequence="10"/>
-    <menuitem id="menu_rental_house_unit" name="Master Unit Rumah" parent="menu_rental_house_root" action="action_rental_house" sequence="20"/>
+
+    <menuitem id="menu_rental_contract" 
+              name="Pemantauan Sewa" 
+              parent="menu_rental_house_root" 
+              action="action_rental_contract" 
+              sequence="10"/>
+
+    <menuitem id="menu_rental_house_unit" 
+              name="Master Unit Rumah" 
+              parent="menu_rental_house_root" 
+              action="action_rental_house" 
+              sequence="20"/>
+
+    <menuitem id="menu_rental_accounting"
+              name="Pembukuan Keuangan"
+              parent="menu_rental_house_root"
+              action="action_rental_accounting"
+              sequence="30"/>
 </odoo>

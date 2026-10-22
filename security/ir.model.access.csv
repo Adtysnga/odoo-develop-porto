@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_rental_house_user,rental.house.user,model_rental_house,base.group_user,1,1,1,1
-access_rental_contract_user,rental.contract.user,model_rental_contract,base.group_user,1,1,1,1
-access_rental_wa_log_user,rental.wa.log.user,model_rental_wa_log,base.group_user,1,1,1,1
+access_rental_house,rental.house,model_rental_house,base.group_user,1,1,1,1
+access_rental_contract,rental.contract,model_rental_contract,base.group_user,1,1,1,1
+access_rental_wa_log,rental.wa.log,model_rental_wa_log,base.group_user,1,1,1,1
+access_rental_accounting,rental.accounting,model_rental_accounting,base.group_user,1,1,1,1

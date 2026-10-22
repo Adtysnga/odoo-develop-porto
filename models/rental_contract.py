@@ -1,6 +1,7 @@
 import logging
 import requests
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -34,7 +35,6 @@ class RentalContract(models.Model):
     house_id = fields.Many2one('rental.house', string='Unit Rumah', required=True, domain="[('status', '=', 'available')]")
     house_type = fields.Selection(related='house_id.house_type', string='Tipe Rumah', store=True)
     
-    # Skema Cicilan
     payment_scheme = fields.Selection([
         ('monthly', 'Perbulan'),
         ('yearly', 'Pertahun')
@@ -44,40 +44,78 @@ class RentalContract(models.Model):
     due_date = fields.Date(string='Tanggal Jatuh Tempo', required=True)
     amount = fields.Float(string='Nominal Cicilan/Sewa', required=True)
     
-    # Status Pembayaran
     state = fields.Selection([
         ('draft', 'Draft'),
         ('active', 'Berjalan'),
         ('overdue', 'Jatuh Tempo (H+1 Belum Bayar)'),
-        ('paid', 'Lunas / Dibayar')
+        ('paid', 'Lunas / Dibayar'),
+        ('done', 'Selesai Kontrak')
     ], string='Status Pembayaran', default='draft', readonly=True)
 
     wa_log_ids = fields.One2many('rental.wa.log', 'contract_id', string='Riwayat Pesan WA')
 
+    # Validasi Mencegah Rumah Tersewa Ditempati Lagi
+    @api.constrains('house_id', 'state')
+    def _check_house_availability(self):
+        for rec in self:
+            if rec.house_id and rec.state in ['active', 'overdue']:
+                existing_contract = self.search([
+                    ('house_id', '=', rec.house_id.id),
+                    ('id', '!=', rec.id),
+                    ('state', 'in', ['active', 'overdue'])
+                ], limit=1)
+                if existing_contract:
+                    raise ValidationError(
+                        f"Unit Rumah '{rec.house_id.name}' TIDAK BISA DISEWA lagi karena saat ini sedang aktif ditempati oleh penyewa lain ({existing_contract.tenant_name})!"
+                    )
+
+    # Sequence Kode Kontrak Otomatis
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', 'New') == 'New':
-                vals['name'] = self.env['ir.sequence'].next_by_code('rental.contract') or 'New'
-        records = super(RentalContract, self).create(vals_list)
-        for rec in records:
-            if rec.house_id:
-                rec.house_id.status = 'rented'
-        return records
+                vals['name'] = self.env['ir.sequence'].next_by_code('rental.contract') or 'SEWA/001'
+        return super(RentalContract, self).create(vals_list)
 
     def action_confirm(self):
-        """ Mengubah status dari Draft ke Berjalan """
+        """ Mengubah status dari Draft ke Berjalan & Ubah Status Rumah ke Tersewa """
         for rec in self:
+            if rec.house_id.status == 'rented':
+                raise ValidationError(f"Rumah '{rec.house_id.name}' sudah berstatus Tersewa dan tidak dapat dipilih!")
+            rec.state = 'active'
+            rec.house_id.status = 'rented'
+
+    def action_set_to_paid(self):
+        """ Mengubah Status menjadi Lunas, Catat Ke Pembukuan, & Perpanjang Jatuh Tempo """
+        for rec in self:
+            # Otomatis catat transaksi ke menu Pembukuan Keuangan
+            self.env['rental.accounting'].create({
+                'contract_id': rec.id,
+                'amount': rec.amount,
+                'notes': f"Pembayaran sewa unit {rec.house_id.name} periode {rec.start_date} s/d {rec.due_date}"
+            })
+            
+            # Perpanjang periode jatuh tempo
+            if rec.payment_scheme == 'monthly':
+                rec.due_date = fields.Date.add(rec.due_date, months=1)
+            else:
+                rec.due_date = fields.Date.add(rec.due_date, years=1)
+            
             rec.state = 'active'
 
+    # FUNGSI UNTUK SUTUS/SELESAI KONTRAK
+    def action_terminate_contract(self):
+        """ Mengakhiri Kontrak Sewa & Mengembalikan Status Rumah Menjadi Tersedia (Kosong) """
+        for rec in self:
+            rec.state = 'done'
+            if rec.house_id:
+                rec.house_id.status = 'available'
+
     def send_wa_message(self, phone, message):
-        """ Fungsi Pengiriman Pesan via WhatsApp Gateway (Fonnte API) """
         url = "https://api.fonnte.com/send"
-        api_token = "MUHaJrm8k6LqYKLL6nkZ"  # Token API Fonnte Terbaru
-        
+        api_token = "MUHaJrm8k6LqYKLL6nkZ"
         payload = {'target': phone, 'message': message}
         headers = {'Authorization': api_token}
-        
         status_log = 'failed'
         try:
             response = requests.post(url, data=payload, headers=headers, timeout=10)
@@ -94,7 +132,6 @@ class RentalContract(models.Model):
         })
 
     def action_manual_send_wa(self):
-        """ Tombol Kirim WA Manual """
         for rec in self:
             msg = (
                 f"Halo Sdr/i {rec.tenant_name},\n\n"
@@ -107,55 +144,42 @@ class RentalContract(models.Model):
 
     @api.model
     def _cron_check_rental_payments(self):
-        """ Cron Job Harian Pengingat WA """
         today = fields.Date.today()
         contracts = self.search([('state', 'in', ['active', 'overdue'])])
-        
         for contract in contracts:
             days_diff = (contract.due_date - today).days
-            
-            # H-5 Pengingat Cicilan
             if days_diff == 5:
-                msg = (
-                    f"Halo Sdr/i {contract.tenant_name},\n\n"
-                    f"Pengingat tagihan sewa rumah *{contract.house_id.name}* "
-                    f"sebesar Rp {contract.amount:,.0f}.\n"
-                    f"Jatuh tempo pada tanggal: *{contract.due_date}* (H-5).\n"
-                    f"Mohon melakukan pembayaran sebelum tanggal tersebut. Terima kasih!"
-                )
+                msg = f"Pengingat tagihan sewa rumah *{contract.house_id.name}* sebesar Rp {contract.amount:,.0f} (H-5)."
                 contract.send_wa_message(contract.tenant_phone, msg)
-                
-            # H+1 Belum Bayar -> Ubah Status ke Overdue
             elif days_diff == -1 and contract.state != 'overdue':
                 contract.state = 'overdue'
-                msg = (
-                    f"⚠️ PEMBERITAHUAN JATUH TEMPO!\n\n"
-                    f"Halo Sdr/i {contract.tenant_name},\n"
-                    f"Tagihan sewa rumah *{contract.house_id.name}* telah JATUH TEMPO per tanggal {contract.due_date}.\n"
-                    f"Status tagihan saat ini: *JATUH TEMPO (H+1 Belum Bayar)*.\n"
-                    f"Mohon segera melakukan pembayaran. Terima kasih."
-                )
-                contract.send_wa_message(contract.tenant_phone, msg)
-                
-            # Mengirim WA Setiap Hari selama masih Overdue
-            elif days_diff < -1 and contract.state == 'overdue':
-                msg = (
-                    f"🔴 PERINGATAN PEMBAYARAN JATUH TEMPO\n\n"
-                    f"Halo Sdr/i {contract.tenant_name},\n"
-                    f"Tagihan sewa rumah Anda sebesar Rp {contract.amount:,.0f} telah melewati jatuh tempo.\n"
-                    f"Mohon SEGERA melakukan pembayaran."
-                )
+                msg = f"⚠️ Tagihan sewa rumah *{contract.house_id.name}* telah JATUH TEMPO."
                 contract.send_wa_message(contract.tenant_phone, msg)
 
-    def action_set_to_paid(self):
-        """ Mengubah Status menjadi Lunas / Dibayar """
-        for rec in self:
-            rec.state = 'paid'
-            if rec.payment_scheme == 'monthly':
-                rec.due_date = fields.Date.add(rec.due_date, months=1)
-            else:
-                rec.due_date = fields.Date.add(rec.due_date, years=1)
-            rec.state = 'active'
+
+class RentalAccounting(models.Model):
+    _name = 'rental.accounting'
+    _description = 'Pembukuan Keuangan Sewa'
+    _order = 'payment_date desc, id desc'
+
+    name = fields.Char(string='No. Transaksi', required=True, copy=False, readonly=True, default='New')
+    contract_id = fields.Many2one('rental.contract', string='Kontrak Sewa', required=True, ondelete='cascade')
+    tenant_name = fields.Char(related='contract_id.tenant_name', string='Nama Penyewa', store=True)
+    house_id = fields.Many2one(related='contract_id.house_id', string='Unit Rumah', store=True)
+    payment_date = fields.Date(string='Tanggal Bayar', default=fields.Date.today, required=True)
+    amount = fields.Float(string='Nominal (Rp)', required=True)
+    payment_method = fields.Selection([
+        ('transfer', 'Transfer Bank'),
+        ('cash', 'Tunai / Cash')
+    ], string='Metode Pembayaran', default='transfer', required=True)
+    notes = fields.Text(string='Catatan Pembukuan')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', 'New') == 'New':
+                vals['name'] = self.env['ir.sequence'].next_by_code('rental.accounting') or 'ACC/001'
+        return super(RentalAccounting, self).create(vals_list)
 
 
 class RentalWALog(models.Model):

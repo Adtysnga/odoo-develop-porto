@@ -1,52 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="action_report_rental_receipt" model="ir.actions.report">
-        <field name="name">Kuitansi Pembayaran Sewa</field>
-        <field name="model">rental.contract</field>
+    <!-- Tombol Aksi Cetak Report PDF -->
+    <record id="action_report_rental_accounting_pdf" model="ir.actions.report">
+        <field name="name">Cetak Laporan Pembukuan (PDF)</field>
+        <field name="model">rental.accounting</field>
         <field name="report_type">qweb-pdf</field>
-        <field name="report_name">rental_house_management.report_rental_receipt_document</field>
-        <field name="report_file">rental_house_management.report_rental_receipt_document</field>
-        <field name="print_report_name">'Kuitansi - %s' % (object.name)</field>
-        <field name="binding_model_id" ref="model_rental_contract"/>
+        <field name="report_name">rental_house_management.report_accounting_template</field>
+        <field name="report_file">rental_house_management.report_accounting_template</field>
+        <field name="binding_model_id" ref="model_rental_accounting"/>
         <field name="binding_type">report</field>
     </record>
 
-    <template id="report_rental_receipt_document">
-        <t t-call="web.external_layout">
-            <t t-foreach="docs" t-as="o">
-                <div class="page">
-                    <h2 class="text-center mt-4">KUITANSI PEMBAYARAN SEWA RUMAH</h2>
-                    <hr/>
-                    <table class="table table-borderless mt-4 fs-5">
-                        <tr>
-                            <td style="width: 30%;"><strong>No. Kuitansi</strong></td>
-                            <td>: <span t-field="o.name"/></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Telah Diterima Dari</strong></td>
-                            <td>: <span t-field="o.tenant_name"/> (<span t-field="o.tenant_phone"/>)</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Unit Rumah</strong></td>
-                            <td>: <span t-field="o.house_id.name"/></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Uang Sejumlah</strong></td>
-                            <td>: <strong>Rp <span t-esc="'{:,}'.format(int(o.amount))"/></strong></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Periode Jatuh Tempo</strong></td>
-                            <td>: <span t-field="o.due_date"/></td>
-                        </tr>
-                    </table>
-                    <div class="row mt-5 text-end">
-                        <div class="col-12">
-                            <p>Dicetak Pada: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d-%m-%Y %H:%M')"/></p>
-                            <br/><br/>
-                            <p><strong>( Admin / Pemilik Rumah )</strong></p>
+    <!-- Template PDF Multi-Halaman -->
+    <template id="report_accounting_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    
+                    <!-- HALAMAN 1: KUITANSI UNTUK PENYEWA -->
+                    <div class="page">
+                        <div class="text-center mb-4">
+                            <h2><strong>BUKTI PEMBAYARAN SEWA RUMAH</strong></h2>
+                            <p class="text-muted">No. Transaksi: <span t-field="doc.name"/></p>
                         </div>
+
+                        <table class="table table-bordered mb-4">
+                            <tr>
+                                <td style="width: 30%;"><strong>Nama Penyewa</strong></td>
+                                <td><span t-field="doc.tenant_name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unit Properti</strong></td>
+                                <td><span t-field="doc.house_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tanggal Bayar</strong></td>
+                                <td><span t-field="doc.payment_date"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Metode Bayar</strong></td>
+                                <td><span t-field="doc.payment_method"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Dibayar</strong></td>
+                                <td><strong><span t-field="doc.amount" t-options='{"widget": "monetary", "display_currency": res_company.currency_id}'/></strong></td>
+                            </tr>
+                        </table>
+
+                        <div class="row text-center mt-5">
+                            <div class="col-6">
+                                <p>Penyewa / Pembayar,</p>
+                                <br/><br/>
+                                <p>( <u><span t-field="doc.tenant_name"/></u> )</p>
+                            </div>
+                            <div class="col-6">
+                                <p>Pengelola / Admin,</p>
+                                <br/><br/>
+                                <p>( _______________________ )</p>
+                            </div>
+                        </div>
+
+                        <!-- PEMISAH HALAMAN BARU (PAGEBREAK) -->
+                        <div class="pagebreak"/>
+
+                        <!-- HALAMAN 2: CATATAN PEMBUKUAN INTERNAL -->
+                        <div class="text-center mb-4 mt-3">
+                            <h2><strong>LAMPIRAN PEMBUKUAN INTERNAL PENGELOLA</strong></h2>
+                            <p class="text-muted">No. Arsip: <span t-field="doc.name"/></p>
+                        </div>
+
+                        <table class="table table-striped mb-4">
+                            <thead>
+                                <tr class="bg-secondary text-white">
+                                    <th>Komponen Pembukuan</th>
+                                    <th>Keterangan</th>
+                                    <th class="text-end">Jumlah</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Pemasukan Sewa Clean</td>
+                                    <td><span t-field="doc.notes"/></td>
+                                    <td class="text-end"><span t-field="doc.amount" t-options='{"widget": "monetary", "display_currency": res_company.currency_id}'/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="alert alert-info">
+                            <strong>Catatan Pembukuan:</strong> Halaman ini merupakan arsip resmi pembukuan kas masuk pengelola properti.
+                        </div>
+
                     </div>
-                </div>
+                </t>
             </t>
         </t>
     </template>
